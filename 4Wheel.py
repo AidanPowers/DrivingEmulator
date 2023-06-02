@@ -4,8 +4,25 @@ Attempted Simulation of this battlebot https://robogames.fandom.com/wiki/Origina
 @author: power105
 """
 import pychrono as chrono
+import pygame
 
-# Create the physical system
+# Initialize Pygame for joystick support
+pygame.init()
+joystick_count = pygame.joystick.get_count()
+## Removed for debugging
+# if joystick_count == 0:
+#     # No joysticks
+#     print("Error, I didn't find any joysticks.")
+#     exit()
+# else:
+#     # Use the first joystick
+#     my_joystick = pygame.joystick.Joystick(0)
+#     my_joystick.init()
+my_joystick = pygame.joystick.Joystick(0)
+my_joystick.init()
+
+
+# Create the system
 system = chrono.ChSystemNSC()
 
 # Create the ground
@@ -14,43 +31,59 @@ ground.SetPos(chrono.ChVectorD(0, 0, -1))
 system.Add(ground)
 
 # Create the vehicle body
-body = chrono.ChBodyEasyBox(2, 1, 0.5, 1000, True, True)
+body = chrono.ChBodyEasyBox(2.0, 1.0, 0.5, 1000, True, True)
 body.SetPos(chrono.ChVectorD(0, 0, 0))
 system.Add(body)
 
 # Create the wheels
-wheel_radius = 0.5
-wheel_width = 0.2
-material = chrono.ChMaterialSurfaceNSC()  # Create a default material
-for i in range(4):
-    x = 1 if i < 2 else -1
-    y = 1 if i % 2 == 0 else -1
-    wheel_position = chrono.ChVectorD(x, y, -wheel_radius)
-    wheel = chrono.ChBody()
-    wheel.SetPos(wheel_position)
-    wheel.SetMass(1000)
-    wheel.SetInertiaXX(chrono.ChVectorD(1, 1, 1)) # You may need to adjust this based on your specific setup
-    wheel.GetCollisionModel().ClearModel()
-    wheel.GetCollisionModel().AddCylinder(material, wheel_radius, wheel_width, wheel_position)
-    wheel.GetCollisionModel().BuildModel()
-    wheel.SetCollide(True)
-    system.Add(wheel)
-    # Create a motor between the body and the wheel
-    motor = chrono.ChLinkMotorRotationSpeed()
-    motor.Initialize(wheel, body, chrono.ChFrameD(chrono.ChVectorD(x, y, 0)))
-    system.AddLink(motor)
-    # Set a constant rotation speed for the motor
-    motor.SetSpeedFunction(chrono.ChFunction_Const(10 if y > 0 else -10))
+wheel_FL = chrono.ChBodyEasyCylinder(0.5, 0.2, 1000, True, True)
+wheel_FR = chrono.ChBodyEasyCylinder(0.5, 0.2, 1000, True, True)
+wheel_RL = chrono.ChBodyEasyCylinder(0.5, 0.2, 1000, True, True)
+wheel_RR = chrono.ChBodyEasyCylinder(0.5, 0.2, 1000, True, True)
 
-# Create the solver
-solver = chrono.ChSolverBB()
-system.SetSolver(solver)
+# Position the wheels
+wheel_FL.SetPos(chrono.ChVectorD(1, 0.75, 0))
+wheel_FR.SetPos(chrono.ChVectorD(1, -0.75, 0))
+wheel_RL.SetPos(chrono.ChVectorD(-1, 0.75, 0))
+wheel_RR.SetPos(chrono.ChVectorD(-1, -0.75, 0))
 
-# Create the integrator
-integrator = chrono.ChTimestepperHHT(system)
-system.SetTimestepper(integrator)
+# Add the wheels to the system
+system.Add(wheel_FL)
+system.Add(wheel_FR)
+system.Add(wheel_RL)
+system.Add(wheel_RR)
 
-# Simulate for 10 seconds
-while system.GetChTime() < 10:
+# Create the motors
+motor_FL = chrono.ChLinkMotorRotationAngle()
+motor_FR = chrono.ChLinkMotorRotationAngle()
+motor_RL = chrono.ChLinkMotorRotationAngle()
+motor_RR = chrono.ChLinkMotorRotationAngle()
+
+# Attach the motors to the wheels
+motor_FL.Initialize(wheel_FL, ground, chrono.ChFrameD(wheel_FL.GetPos()))
+motor_FR.Initialize(wheel_FR, ground, chrono.ChFrameD(wheel_FR.GetPos()))
+motor_RL.Initialize(wheel_RL, ground, chrono.ChFrameD(wheel_RL.GetPos()))
+motor_RR.Initialize(wheel_RR, ground, chrono.ChFrameD(wheel_RR.GetPos()))
+
+# Add the motors to the system
+system.Add(motor_FL)
+system.Add(motor_FR)
+system.Add(motor_RL)
+system.Add(motor_RR)
+
+# Main simulation loop
+while True:
+    pygame.event.pump()
+
+    # Get joystick inputs
+    left_y = my_joystick.get_axis(1)
+    right_y = my_joystick.get_axis(3)
+
+    # Control the motors based on joystick inputs
+    motor_FL.SetDesiredRotation(chrono.ChQuaternionD(left_y, 0, 0, 1))
+    motor_FR.SetDesiredRotation(chrono.ChQuaternionD(right_y, 0, 0, 1))
+    motor_RL.SetDesiredRotation(chrono.ChQuaternionD(left_y, 0, 0, 1))
+    motor_RR.SetDesiredRotation(chrono.ChQuaternionD(right_y, 0, 0, 1))
+
+    # Perform a step of the simulation
     system.DoStepDynamics(0.01)
-
